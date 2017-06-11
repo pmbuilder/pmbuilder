@@ -1,0 +1,3 @@
+* properly skip already built packages
+* challenge the build locally, before comitting to the repo
+* put the packages list in a JSON file
