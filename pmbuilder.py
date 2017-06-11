@@ -27,12 +27,14 @@ packages = {"hello-world": ["x86_64"]}
 import sys
 import os
 import logging
+import glob
 sys.path.append(dir_pmbootstrap)
 import pmb.aportgen
 import pmb.helpers.run
 import pmb.helpers.logging
 import pmb.chroot.shutdown
 import pmb.build
+import pmb.parse.other
 
 # Initialize args
 sys.argv = ["pmbootstrap.py", "chroot"]
@@ -51,6 +53,10 @@ pmb.chroot.shutdown(args)
 if os.path.exists(args.work + "/packages"):
     pmb.helpers.run.root(args, ["rm", "-r", args.work + "/packages"])
 pmb.helpers.run.user(args, ["cp", "-r", dir_staging, args.work + "/packages"])
+
+# Restore the file extension, fix ownership
+for apk in glob.glob(args.work + "packages/*/*.apk.unverified"):
+    os.rename(apk, apk[:-len(".unverified")])
 pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
 
 # Build the first outdated package
@@ -78,6 +84,10 @@ for pkgname, architectures in packages.items():
                              apkbuild["pkgver"] + "-r" +
                              apkbuild["pkgrel"] + ".apk")
         pmb.build.challenge(args, dir_staging + "/" + apk_path_relative)
+
+        # Change the file extension to .apk.unverified
+        for apk in glob.glob(dir_staging + "/*/*.apk"):
+            os.rename(apk, apk + ".unverified")
 
         # Commit
         os.chdir(dir_staging)
