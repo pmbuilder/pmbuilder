@@ -56,10 +56,10 @@ pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
 # Build the first outdated package
 for pkgname, architectures in packages.items():
     for arch in architectures:
-        # Skip up-to-date packages (FIXME: suffix parameter is unnecessary!)
+        # Skip up-to-date packages
         aport = pmb.build.find_aport(args, pkgname)
         apkbuild = pmb.parse.apkbuild(aport + "/APKBUILD")
-        if not pmb.build.other.is_necessary(args, "native", arch, apkbuild):
+        if not pmb.build.other.is_necessary(args, arch, apkbuild):
             print(pkgname + " (" + arch + "): up to date")
             continue
 
