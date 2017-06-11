@@ -63,7 +63,7 @@ for pkgname, architectures in packages.items():
             print(pkgname + " (" + arch + "): up to date")
             continue
 
-        # Build with deviceinfo
+        # Build with buildinfo
         print(pkgname + " (" + arch + "): building...")
         pmb.build.package(args, pkgname, arch, force=True,
                           recurse=False, buildinfo=True)
