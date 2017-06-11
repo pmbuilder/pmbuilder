@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Config
 dir_pmbootstrap = "/home/user/code/pmbootstrap"
 dir_staging = "/home/user/code/pmOS-binary-packages-staging"
-dir_work = "/home/user/.local/var/pmbootstrap"
 packages = {"hello-world": ["x86_64"]}
 
 # Imports
@@ -71,7 +70,7 @@ for pkgname, architectures in packages.items():
 
         # Copy the packages folder back
         pmb.helpers.run.user(args, ["rm", "-rf", dir_staging])
-        pmb.helpers.run.user(args, ["cp", "-r", dir_work + "/packages",
+        pmb.helpers.run.user(args, ["cp", "-r", args.work + "/packages",
                                     dir_staging])
 
         # Commit
