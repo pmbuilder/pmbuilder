@@ -73,12 +73,17 @@ for pkgname, architectures in packages.items():
         pmb.helpers.run.user(args, ["cp", "-r", args.work + "/packages",
                                     dir_staging])
 
+        # Challenge the build, so we know it is reproducible
+        apk_path_relative = (arch + "/" + pkgname + "-" +
+                             apkbuild["pkgver"] + "-r" +
+                             apkbuild["pkgrel"] + ".apk")
+        pmb.build.challenge(args, dir_staging + "/" + apk_path_relative)
+
         # Commit
         os.chdir(dir_staging)
-        msg = (arch + ": " + pkgname + "-" + apkbuild["pkgver"] +
-               "-r" + apkbuild["pkgrel"])
         pmb.helpers.run.user(args, ["git", "add", "-A"])
-        pmb.helpers.run.user(args, ["git", "commit", "-m", msg])
+        pmb.helpers.run.user(args, ["git", "commit", "-m",
+                                    apk_path_relative])
 
         # We're done!
         logging.info("Next steps:")
