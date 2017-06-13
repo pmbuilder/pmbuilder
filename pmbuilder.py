@@ -21,24 +21,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Config
 dir_pmbootstrap = "/home/user/code/pmbootstrap"
 dir_staging = "/home/user/code/pmOS-binary-packages-staging"
-packages = {"hello-world": ["x86_64"]}
+packages = {
+    "hello-world": ["x86_64"],
+    "qemu-user-static-repack": ["x86_64"],
+    "musl-armhf": ["x86_64"],
+    "binutils-armhf": ["x86_64"],
+    "gcc-armhf": ["x86_64"]
+}
 
 # Imports
 import sys
 import os
 import logging
 import glob
+import argparse
 sys.path.append(dir_pmbootstrap)
 import pmb.aportgen
-import pmb.helpers.run
-import pmb.helpers.logging
-import pmb.chroot.shutdown
 import pmb.build
+import pmb.chroot.shutdown
+import pmb.helpers.run
+import pmb.helpers.repo
+import pmb.helpers.logging
 import pmb.parse.other
 
-# Initialize args
+# Parse own arguments
+parser = argparse.ArgumentParser(prog="pmbuilder")
+parser.add_argument("--reset", help="reset repo hard to orign/master and clean"
+                    "all untracked files (bring the repo in the same state as"
+                    "uploaded)", action="store_true")
+args_pmbuilder = parser.parse_args()
+
+# Initialize args compatible to pmbootstrap
 sys.argv = ["pmbootstrap.py", "chroot"]
 args = pmb.parse.arguments()
+setattr(args, "output_repo_changes", None)
 pmb.helpers.logging.init(args)
 
 # Reset local copy of staging repo
@@ -46,18 +62,20 @@ if not os.path.exists(dir_staging):
     raise RuntimeError("Please clone the staging repo into this folder"
                        " first: " + dir_staging)
 os.chdir(dir_staging)
-pmb.helpers.run.user(args, ["git", "reset", "--hard", "origin/master"])
+if args_pmbuilder.reset:
+    pmb.helpers.run.user(args, ["git", "reset", "--hard", "origin/master"])
+    pmb.helpers.run.user(args, ["git", "clean", "-d", "-x", "-f"])
 
-# Copy staging repo to work/packages
-pmb.chroot.shutdown(args)
-if os.path.exists(args.work + "/packages"):
-    pmb.helpers.run.root(args, ["rm", "-r", args.work + "/packages"])
-pmb.helpers.run.user(args, ["cp", "-r", dir_staging, args.work + "/packages"])
+    # Copy staging repo to work/packages
+    pmb.chroot.shutdown(args)
+    if os.path.exists(args.work + "/packages"):
+        pmb.helpers.run.root(args, ["rm", "-r", args.work + "/packages"])
+    pmb.helpers.run.user(args, ["cp", "-r", dir_staging, args.work + "/packages"])
 
-# Restore the file extension, fix ownership
-for apk in glob.glob(args.work + "packages/*/*.apk.unverified"):
-    os.rename(apk, apk[:-len(".unverified")])
-pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
+    # Restore the file extension, fix ownership
+    for apk in glob.glob(args.work + "packages/*/*.apk.unverified"):
+        os.rename(apk, apk[:-len(".unverified")])
+    pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
 
 # Build the first outdated package
 for pkgname, architectures in packages.items():
@@ -71,13 +89,19 @@ for pkgname, architectures in packages.items():
 
         # Build with buildinfo
         print(pkgname + " (" + arch + "): building...")
+        repo_before = pmb.helpers.repo.files(args)
+        logging.debug(str(repo_before))
         pmb.build.package(args, pkgname, arch, force=True,
                           recurse=False, buildinfo=True)
+        repo_diff = pmb.helpers.repo.diff(args, repo_before)
+        logging.debug(str(repo_diff))
 
-        # Copy the packages folder back
-        pmb.helpers.run.user(args, ["rm", "-rf", dir_staging])
-        pmb.helpers.run.user(args, ["cp", "-r", args.work + "/packages",
-                                    dir_staging])
+        # Copy back the files modified during the build
+        for file in repo_diff:
+            arch = os.path.dirname(file)
+            pmb.helpers.run.user(args, ["mkdir", "-p", dir_staging + "/" + arch])
+            pmb.helpers.run.user(args, ["cp", args.work + "/packages/" +
+                                 file, dir_staging + "/" + file])
 
         # Challenge the build, so we know it is reproducible
         apk_path_relative = (arch + "/" + pkgname + "-" +
@@ -88,6 +112,10 @@ for pkgname, architectures in packages.items():
         # Change the file extension to .apk.unverified
         for apk in glob.glob(dir_staging + "/*/*.apk"):
             os.rename(apk, apk + ".unverified")
+
+        # Write down the last changed file
+        with open(dir_staging + "/last_modified.txt", "w") as handle:
+            handle.write(apk_path_relative + "\n")
 
         # Commit
         os.chdir(dir_staging)
@@ -104,3 +132,8 @@ for pkgname, architectures in packages.items():
         logging.info("3. Run pmbuilder.py again, until there are no"
                      " packages left, that need to be rebuilt.")
         sys.exit(0)
+
+
+logging.info("Nothing to do, all packages are up to date!")
+sys.exit(1)
+
