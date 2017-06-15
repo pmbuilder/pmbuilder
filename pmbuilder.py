@@ -21,13 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Config
 dir_pmbootstrap = "/home/user/code/pmbootstrap"
 dir_staging = "/home/user/code/pmOS-binary-packages-staging"
-packages = {
-    "hello-world": ["x86_64"],
-    "qemu-user-static-repack": ["x86_64"],
-    "musl-armhf": ["x86_64"],
-    "binutils-armhf": ["x86_64"],
-    "gcc-armhf": ["x86_64"]
-}
+arch_devices = ["armhf", "aarch64"]
+arch_native = ["x86_64"]
+
 
 # Imports
 import sys
@@ -51,11 +47,40 @@ parser.add_argument("--reset", help="reset repo hard to orign/master and clean"
                     "uploaded)", action="store_true")
 args_pmbuilder = parser.parse_args()
 
+# packages: native only
+packages = {"hello-world": arch_native}
+for pkgname in [
+    "0xffff",
+    "ccache-cross-symlinks",
+    "gcc-cross-wrappers",
+    "heimdall",
+    "postmarketos-base",
+    "postmarketos-demos",
+    "postmarketos-mkinitfs",
+    "postmarketos-mkinitfs-hook-usb-shell",
+    "qemu-user-static-repack",
+]:
+    packages[pkgname] = arch_native
+
+# packages: cross-compilers (native only)
+for arch in arch_devices:
+    for pkgname in ["musl", "binutils", "gcc"]:
+        packages[pkgname + "-" + arch] = arch_native
+
+# packages: native and device
+for pkgname in ["mkbootimg", "unpackbootimg"]:
+    packages[pkgname] = arch_devices + arch_native
+
+# packages: device only
+for pkgname in ["weston"]:
+    packages[pkgname] = arch_devices
+
 # Initialize args compatible to pmbootstrap
 sys.argv = ["pmbootstrap.py", "chroot"]
 args = pmb.parse.arguments()
 setattr(args, "output_repo_changes", None)
 pmb.helpers.logging.init(args)
+
 
 # Reset local copy of staging repo
 if not os.path.exists(dir_staging):
@@ -70,7 +95,8 @@ if args_pmbuilder.reset:
     pmb.chroot.shutdown(args)
     if os.path.exists(args.work + "/packages"):
         pmb.helpers.run.root(args, ["rm", "-r", args.work + "/packages"])
-    pmb.helpers.run.user(args, ["cp", "-r", dir_staging, args.work + "/packages"])
+    pmb.helpers.run.user(
+        args, ["cp", "-r", dir_staging, args.work + "/packages"])
 
     # Restore the file extension, fix ownership
     for apk in glob.glob(args.work + "packages/*/*.apk.unverified"):
@@ -83,25 +109,26 @@ for pkgname, architectures in packages.items():
         # Skip up-to-date packages
         aport = pmb.build.find_aport(args, pkgname)
         apkbuild = pmb.parse.apkbuild(aport + "/APKBUILD")
-        if not pmb.build.other.is_necessary(args, arch, apkbuild):
+        apkindex_path = dir_staging + "/" + arch + "/APKINDEX.tar.gz"
+        if not pmb.build.other.is_necessary(args, arch, apkbuild,
+                                            apkindex_path):
             print(pkgname + " (" + arch + "): up to date")
             continue
 
         # Build with buildinfo
         print(pkgname + " (" + arch + "): building...")
         repo_before = pmb.helpers.repo.files(args)
-        logging.debug(str(repo_before))
         pmb.build.package(args, pkgname, arch, force=True,
                           recurse=False, buildinfo=True)
         repo_diff = pmb.helpers.repo.diff(args, repo_before)
-        logging.debug(str(repo_diff))
 
         # Copy back the files modified during the build
         for file in repo_diff:
             arch = os.path.dirname(file)
-            pmb.helpers.run.user(args, ["mkdir", "-p", dir_staging + "/" + arch])
+            pmb.helpers.run.user(
+                args, ["mkdir", "-p", dir_staging + "/" + arch])
             pmb.helpers.run.user(args, ["cp", args.work + "/packages/" +
-                                 file, dir_staging + "/" + file])
+                                        file, dir_staging + "/" + file])
 
         # Challenge the build, so we know it is reproducible
         apk_path_relative = (arch + "/" + pkgname + "-" +
@@ -136,4 +163,3 @@ for pkgname, architectures in packages.items():
 
 logging.info("Nothing to do, all packages are up to date!")
 sys.exit(1)
-
