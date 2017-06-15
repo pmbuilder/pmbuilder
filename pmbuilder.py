@@ -42,9 +42,9 @@ import pmb.parse.other
 
 # Parse own arguments
 parser = argparse.ArgumentParser(prog="pmbuilder")
-parser.add_argument("--reset", help="reset repo hard to orign/master and clean"
+parser.add_argument("--no-reset", help="don't reset repo hard to orign/master and clean"
                     "all untracked files (bring the repo in the same state as"
-                    "uploaded)", action="store_true")
+                    "uploaded)", action="store_false", dest="reset")
 args_pmbuilder = parser.parse_args()
 
 # packages: native only
