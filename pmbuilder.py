@@ -39,6 +39,7 @@ import pmb.helpers.run
 import pmb.helpers.repo
 import pmb.helpers.logging
 import pmb.parse.other
+import pmb.challenge
 
 # Parse own arguments
 parser = argparse.ArgumentParser(prog="pmbuilder")
@@ -54,10 +55,9 @@ for pkgname in [
     "ccache-cross-symlinks",
     "gcc-cross-wrappers",
     "heimdall",
-    "postmarketos-base",
-    "postmarketos-demos",
     "postmarketos-mkinitfs",
     "postmarketos-mkinitfs-hook-usb-shell",
+    "postmarketos-base",
     "qemu-user-static-repack",
 ]:
     packages[pkgname] = arch_native
@@ -72,7 +72,7 @@ for pkgname in ["mkbootimg", "unpackbootimg"]:
     packages[pkgname] = arch_devices + arch_native
 
 # packages: device only
-for pkgname in ["weston"]:
+for pkgname in ["weston", "postmarketos-demos"]:
     packages[pkgname] = arch_devices
 
 # Initialize args compatible to pmbootstrap
@@ -134,13 +134,17 @@ for pkgname, architectures in packages.items():
         apk_path_relative = (arch + "/" + pkgname + "-" +
                              apkbuild["pkgver"] + "-r" +
                              apkbuild["pkgrel"] + ".apk")
-        pmb.build.challenge(args, dir_staging + "/" + apk_path_relative)
+        pmb.challenge.build(args, dir_staging + "/" + apk_path_relative)
 
         # Change the file extension to .apk.unverified
         for apk in glob.glob(dir_staging + "/*/*.apk"):
             os.rename(apk, apk + ".unverified")
 
-        # Write down the last changed file
+        # Challenge all APKINDEX.tar.gz files in the staging repo
+        for path_apkindex in glob.glob(dir_staging + "/*/APKINDEX.tar.gz"):
+            pmb.challenge.apkindex(args, path_apkindex, ".unverified")
+
+        # Write down the last built package
         with open(dir_staging + "/last_modified.txt", "w") as handle:
             handle.write(apk_path_relative + "\n")
 
@@ -163,3 +167,4 @@ for pkgname, architectures in packages.items():
 
 logging.info("Nothing to do, all packages are up to date!")
 sys.exit(1)
+
