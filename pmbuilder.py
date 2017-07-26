@@ -84,7 +84,7 @@ for pkgname, architectures in packages.items():
     for arch in architectures:
         # Skip up-to-date packages
         aport = pmb.build.find_aport(args, pkgname)
-        apkbuild = pmb.parse.apkbuild(aport + "/APKBUILD")
+        apkbuild = pmb.parse.apkbuild(args, aport + "/APKBUILD")
         apkindex_path = dir_staging + "/" + arch + "/APKINDEX.tar.gz"
         if not pmb.build.other.is_necessary(args, arch, apkbuild,
                                             apkindex_path):
@@ -95,7 +95,7 @@ for pkgname, architectures in packages.items():
         print(pkgname + " (" + arch + "): building...")
         repo_before = pmb.helpers.repo.files(args)
         pmb.build.package(args, pkgname, arch, force=True,
-                          recurse=False, buildinfo=True)
+                          buildinfo=True)
         repo_diff = pmb.helpers.repo.diff(args, repo_before)
 
         # Copy back the files modified during the build
