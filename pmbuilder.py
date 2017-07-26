@@ -38,8 +38,10 @@ import pmb.chroot.shutdown
 import pmb.helpers.run
 import pmb.helpers.repo
 import pmb.helpers.logging
-import pmb.parse.other
 import pmb.challenge
+
+import packages
+
 
 # Parse own arguments
 parser = argparse.ArgumentParser(prog="pmbuilder")
@@ -47,33 +49,6 @@ parser.add_argument("--no-reset", help="don't reset repo hard to orign/master an
                     "all untracked files (bring the repo in the same state as"
                     "uploaded)", action="store_false", dest="reset")
 args_pmbuilder = parser.parse_args()
-
-# packages: native only
-packages = {"hello-world": arch_native}
-for pkgname in [
-    "0xffff",
-    "ccache-cross-symlinks",
-    "gcc-cross-wrappers",
-    "heimdall",
-    "postmarketos-mkinitfs",
-    "postmarketos-mkinitfs-hook-usb-shell",
-    "postmarketos-base",
-    "qemu-user-static-repack",
-]:
-    packages[pkgname] = arch_native
-
-# packages: cross-compilers (native only)
-for arch in arch_devices:
-    for pkgname in ["musl", "binutils", "gcc"]:
-        packages[pkgname + "-" + arch] = arch_native
-
-# packages: native and device
-for pkgname in ["mkbootimg", "unpackbootimg"]:
-    packages[pkgname] = arch_devices + arch_native
-
-# packages: device only
-for pkgname in ["weston", "postmarketos-demos"]:
-    packages[pkgname] = arch_devices
 
 # Initialize args compatible to pmbootstrap
 sys.argv = ["pmbootstrap.py", "chroot"]
@@ -104,6 +79,7 @@ if args_pmbuilder.reset:
     pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
 
 # Build the first outdated package
+packages = packages.packages(arch_native, arch_devices)
 for pkgname, architectures in packages.items():
     for arch in architectures:
         # Skip up-to-date packages
