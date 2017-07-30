@@ -74,7 +74,7 @@ if args_pmbuilder.reset:
         args, ["cp", "-r", dir_staging, args.work + "/packages"])
 
     # Restore the file extension, fix ownership
-    for apk in glob.glob(args.work + "packages/*/*.apk.unverified"):
+    for apk in glob.glob(args.work + "/packages/*/*.apk.unverified"):
         os.rename(apk, apk[:-len(".unverified")])
     pmb.chroot.root(args, ["chown", "-R", "user", "/home/user/packages"])
 
