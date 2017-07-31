@@ -29,6 +29,7 @@ def packages(arch_native, arch_devices):
         "ccache-cross-symlinks",
         "gcc-cross-wrappers",
         "heimdall",
+        "postmarketos-splash",
         "postmarketos-mkinitfs",
         "postmarketos-mkinitfs-hook-usb-shell",
         "postmarketos-base",
