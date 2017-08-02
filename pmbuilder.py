@@ -73,6 +73,11 @@ if args_pmbuilder.reset:
     pmb.helpers.run.user(
         args, ["cp", "-r", dir_staging, args.work + "/packages"])
 
+    # Remove files, that confuse pmbootstrap's repo indexing
+    for pattern in ["last_modified.txt", "*.pub", "README.md"]:
+        for file in glob.glob(args.work + "/packages/" + pattern):
+            pmb.helpers.run.user(args, ["rm", file])
+
     # Restore the file extension, fix ownership
     for apk in glob.glob(args.work + "/packages/*/*.apk.unverified"):
         os.rename(apk, apk[:-len(".unverified")])
@@ -97,6 +102,28 @@ for pkgname, architectures in packages.items():
         pmb.build.package(args, pkgname, arch, force=True,
                           buildinfo=True)
         repo_diff = pmb.helpers.repo.diff(args, repo_before)
+
+        # Remove old versions of the packages, that have just been built
+        for file in repo_diff:
+            file_without_version = "-".join(file.split("-")[:-2])
+            for file in glob.glob(args.work + "/packages/" + file_without_version + "-*"):
+                is_new = False
+                for file_new in repo_diff:
+                    if file.endswith(file_new):
+                        is_new = True
+                        break
+                if not is_new:
+                    file_relative = file[len(args.work + "/packages/"):]
+                    logging.info("Remove old file: " + file_relative)
+                    pmb.helpers.run.root(args, ["rm", file])
+                    file_staging = dir_staging + "/" + file_relative
+                    if file_staging.endswith(".apk"):
+                        file_staging += ".unverified"
+                    pmb.helpers.run.user(args, ["rm", file_staging])
+
+        # Rebuild the APKINDEX files, so they do not include references to
+        # outdated packages
+        pmb.build.index_repo(args)
 
         # Copy back the files modified during the build
         for file in repo_diff:
@@ -127,6 +154,7 @@ for pkgname, architectures in packages.items():
         # Commit
         os.chdir(dir_staging)
         pmb.helpers.run.user(args, ["git", "add", "-A"])
+        pmb.helpers.run.user(args, ["git", "status"])
         pmb.helpers.run.user(args, ["git", "commit", "-m",
                                     apk_path_relative])
 
