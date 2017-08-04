@@ -66,10 +66,12 @@ if args_pmbuilder.reset:
     pmb.helpers.run.user(args, ["git", "reset", "--hard", "origin/master"])
     pmb.helpers.run.user(args, ["git", "clean", "-d", "-x", "-f"])
 
-    # Copy staging repo to work/packages
+    # Copy staging repo to work/packages and zap chroots
     pmb.chroot.shutdown(args)
     if os.path.exists(args.work + "/packages"):
         pmb.helpers.run.root(args, ["rm", "-r", args.work + "/packages"])
+    for path in glob.glob(args.work + "/chroot_*"):
+        pmb.helpers.run.root(args, ["rm", "-rf", path])
     pmb.helpers.run.user(
         args, ["cp", "-r", dir_staging, args.work + "/packages"])
 
